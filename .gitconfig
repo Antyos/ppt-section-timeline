@@ -1,0 +1,7 @@
+[diff "zip"]
+	# See:
+	#   https://tante.cc/2010/06/23/managing-zip-based-file-formats-in-git/
+	#   https://gist.github.com/SeanSobey/a9b3d5b184046336e004ac7ee13b8d85
+	# textconv = unzip -c -a
+	textconv = 7z -so e
+	binary = true

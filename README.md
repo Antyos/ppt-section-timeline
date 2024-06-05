@@ -1,8 +1,10 @@
-# PowerPoint Update Section Labels
+# PowerPoint Section Timeline Add-In
 
-Automatically update in-slide section labels.
+Automatically update an in-slide section timeline.
 
 ![Slide Timeline Example](SectionTimelineExample.png)
+
+> The section timeline is in the top right corner.
 
 ## Usage
 
@@ -22,7 +24,7 @@ Automatically update in-slide section labels.
 > [!IMPORTANT]
 >
 > If you are adding sections to an existing presentation, make sure you have the
-> `Auto Update Section Labels` option ***disabled*** or have footers hidden while
+> `Auto Update Timeline` option ***disabled*** or have footers hidden while
 > adding your first 2 sections so that the style for active sections is not
 > propagated to inactive sections, i.e., adding the first section will make the
 > entire footer have black text, so when you add a second section, it will

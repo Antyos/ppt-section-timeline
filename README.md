@@ -2,17 +2,32 @@
 
 Automatically update in-slide section labels.
 
+![SlideLabelsExample](SectionLabelsExample.png)
+
 ## Usage
 
+- Adds a command group called "Section Status Bar" in the Design Tab.
 - Creates a section header for all slides with the "Footer" enabled (See:
   **Insert > Header & Footer**)
 - Sections starting with `_` or `Default Section` will be ignored.
 - Preserves the original formatting of the footer text box.
-- Updates are triggered on new slides or when slides are re-arranged.
+- Updates are triggered on new slides or when slides are re-arranged. This can
+  be toggled on/off in the **Design > Section Status Bar > Auto Update Section Labels**.
 - The current section is colored in black on slides with light backgrounds and
-  white on slides with dark backgrounds.
+  white on slides with dark backgrounds. The current section is bolded by
+  default, but this can be toggled in **Design > Section Status Bar > Bold Active Section**.
 
 ### Caveats
+
+> [!IMPORTANT]
+>
+> If you are adding sections to an existing presentation, make sure you have the
+> `Auto Update Section Labels` option ***disabled*** or have footers hidden while
+> adding your first 2 sections so that the style for active sections is not
+> propagated to inactive sections, i.e., adding the first section will make the
+> entire footer have black text, so when you add a second section, it will
+> assume you also have black text for all inactive sections. See below for how
+> to resolve this.
 
 - If the entire text box is the "current section" color, (such as if there is
   only one initial section), when the text box is updated with new section text,
@@ -23,23 +38,28 @@ Automatically update in-slide section labels.
 - It is possible in some cases that when slides in the first section are
   updated, the "selected section" color will propagate to the whole label. See
   the note above for how to resolve.
-- The "slide change" update is technically processed when the _selected_ slide
+- The "slide change" update is technically processed when the *selected* slide
   changes (due to PowerPoint limitations), so if you move the slide you have
   currently selected, the update will not process until you select a different
   slide.
-- Moving slides between sections but maintaining the overall slide order will
-  not trigger an update, however, they will be updated on the next update.
+
+## Extras
+
+- **Change Video**: Swap a video with another video on disk while preserving the
+  animations.
+    - Can be found in the right-click context menu for videos or in the "Video
+      Format" tab, i.e., **Video Format > Change > Change Video**.
+    - Note: Using this on a video in a (non-nested) group will work, however
+      undoing the replace may corrupt the animations on the slide.
 
 ## Installation
 
-1. Add `SectionStatusBar.ppam` to your `%APPDATA%\Microsoft\AddIns` folder.
+1. Add `SectionStatusBar.ppam` to your `%APPDATA%\Microsoft\AddIns` folder (Windows).
 2. In PowerPoint, navigate to **Developer > PowerPoint Add-Ins** OR go to
    **Settings > Add-Ins > Manage**, select "PowerPoint Add-ins" and click
    **Go**.
 3. Click **Add New** and select `SectionStatusBar.ppam`. If you are prompted
    about enabling macros, click "Yes".
-4. (Optional) Go to **Options > Quick Access Toolbar**, select "All Commands",
-   scroll down to "Update Section Labels" and add it to your toolbar.
 
 > Note: The add-in is loaded based on the file path, so if you move or delete
 > `SectionStatusBar.ppam`, PowerPoint will not be able to load it.

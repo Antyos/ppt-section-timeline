@@ -12,7 +12,7 @@ Automatically update in-slide section labels.
 - Sections starting with `_` or `Default Section` will be ignored.
 - Preserves the original formatting of the footer text box.
 - Updates are triggered on new slides or when slides are re-arranged. This can
-  be toggled on/off in the **Design > Section Status Bar > Auto Update Section Labels**.
+  be toggled on/off in the **Design > Section Status Bar > Auto Update Timeline**.
 - The current section is colored in black on slides with light backgrounds and
   white on slides with dark backgrounds. The current section is bolded by
   default, but this can be toggled in **Design > Section Status Bar > Bold Active Section**.

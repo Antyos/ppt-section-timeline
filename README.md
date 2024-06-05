@@ -2,11 +2,11 @@
 
 Automatically update in-slide section labels.
 
-![SlideLabelsExample](SectionLabelsExample.png)
+![Slide Timeline Example](SectionTimelineExample.png)
 
 ## Usage
 
-- Adds a command group called "Section Status Bar" in the Design Tab.
+- Adds a command group called "Section Timeline" in the Design Tab.
 - Creates a section header for all slides with the "Footer" enabled (See:
   **Insert > Header & Footer**)
 - Sections starting with `_` or `Default Section` will be ignored.
@@ -54,14 +54,14 @@ Automatically update in-slide section labels.
 
 ## Installation
 
-1. Add `SectionStatusBar.ppam` to your `%APPDATA%\Microsoft\AddIns` folder (Windows).
+1. Add `SectionTimeline.ppam` to your `%APPDATA%\Microsoft\AddIns` folder (Windows).
 2. In PowerPoint, navigate to **Developer > PowerPoint Add-Ins** OR go to
    **Settings > Add-Ins > Manage**, select "PowerPoint Add-ins" and click
    **Go**.
-3. Click **Add New** and select `SectionStatusBar.ppam`. If you are prompted
+3. Click **Add New** and select `SectionTimeline.ppam`. If you are prompted
    about enabling macros, click "Yes".
 
 > Note: The add-in is loaded based on the file path, so if you move or delete
-> `SectionStatusBar.ppam`, PowerPoint will not be able to load it.
+> `SectionTimeline.ppam`, PowerPoint will not be able to load it.
 
 To stop the functionality, the add-in can be disabled or removed at any time.

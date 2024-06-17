@@ -4,48 +4,49 @@ Automatically update an in-slide section timeline.
 
 ![Slide Timeline Example](SectionTimelineExample.png)
 
-> The section timeline is in the top right corner.
+> The section timeline is located in the top right corner of the slide.
 
-## Usage
+- [PowerPoint Section Timeline Add-In](#powerpoint-section-timeline-add-in)
+    - [Features](#features)
+        - [Section Timeline](#section-timeline)
+        - [Change Video](#change-video)
+        - [Add to Group](#add-to-group)
+        - [Swap Animations](#swap-animations)
+    - [Installation](#installation)
+
+## Features
+
+### Section Timeline
 
 - Adds a command group called "Section Timeline" in the Design Tab.
-- Creates a section header for all slides with the "Footer" enabled (See:
+- Creates a section timeline header for all slides with the "Footer" enabled (See:
   **Insert > Header & Footer**)
-- Sections starting with `_` or `Default Section` will be ignored.
+- The section timeline will only show up once there are at least 2 sections with
+  valid names. Sections starting with `_` or `Default Section` will be ignored.
 - Preserves the original formatting of the footer text box.
 - Updates are triggered on new slides or when slides are re-arranged. This can
   be toggled on/off in the **Design > Section Status Bar > Auto Update Timeline**.
+- Customize the separator between sections in **Design > Section Status Bar > Separator**.
 - The current section is colored in black on slides with light backgrounds and
   white on slides with dark backgrounds. The current section is bolded by
   default, but this can be toggled in **Design > Section Status Bar > Bold Active Section**.
 
-### Caveats
-
 > [!IMPORTANT]
 >
-> If you are adding sections to an existing presentation, make sure you have the
-> `Auto Update Timeline` option ***disabled*** or have footers hidden while
-> adding your first 2 sections so that the style for active sections is not
-> propagated to inactive sections, i.e., adding the first section will make the
-> entire footer have black text, so when you add a second section, it will
-> assume you also have black text for all inactive sections. See below for how
-> to resolve this.
+> If the entire text box is the "current section" color, (such as if there is
+> only one initial section), when the text box is updated with new section text,
+> the text will inherit that font color, so the text will no longer stand out.
+> Click on the text box and click **Clear All Formatting** (next to font size
+> adjustment) to revert the textbox to its original formatting. The next update
+> will fix the highlighted text.
 
-- If the entire text box is the "current section" color, (such as if there is
-  only one initial section), when the text box is updated with new section text,
-  the text will inherit that font color, so the text will no longer stand out.
-  Click on the text box and click **Clear All Formatting** (next to font size
-  adjustment) to revert the textbox to its original formatting. The next update
-  will fix the highlighted text.
-- It is possible in some cases that when slides in the first section are
-  updated, the "selected section" color will propagate to the whole label. See
-  the note above for how to resolve.
-- The "slide change" update is technically processed when the *selected* slide
-  changes (due to PowerPoint limitations), so if you move the slide you have
-  currently selected, the update will not process until you select a different
-  slide.
+> [!NOTE]
+>
+> The "slide change" update is officially processed when the *selected* slide
+> changes (due to PowerPoint limitations). If you move the currently selected
+> slide, the update will not process until after you select a different slide.
 
-## Extras
+### Change Video
 
 - **Change Video**: Swap a video with another video on disk while preserving the
   animations.
@@ -53,6 +54,21 @@ Automatically update an in-slide section timeline.
       Format" tab, i.e., **Video Format > Change > Change Video**.
     - Note: Using this on a video in a (non-nested) group will work, however
       undoing the replace may corrupt the animations on the slide.
+
+### Add to Group
+
+- **Add to Group**: Add the selected shape to a group.
+    - Found in the right-click context menu for shapes under the "Group" tab.
+    - If a group is not selected, the two shapes will be grouped together while
+      preserving the animations of the most recently selected shape with animations.
+    - Does not work with nested groups. For subgroups, [swap the animations](#swap-animations)
+      to another shape first, ungroup as many levels as necessary, then re-group
+      and swap the animations back.
+
+### Swap Animations
+
+- **Swap Animations**: Swaps the animations on two shapes.
+    - Found in the "Animations", i.e., **Animations > Swap > Swap**
 
 ## Installation
 

@@ -6,19 +6,6 @@ Public Sub AddInLoaded(ribbon As IRibbonUI)
     Set ribbonUI = ribbon
 End Sub
 
-' Disable in read-only mode
-Function isWritable() As Boolean
-    ' Because we don't have short-circuiting in if statements, we write them all out
-    If Application Is Nothing Then
-        isWritable = False
-    ElseIf ActivePresentation Is Nothing Then
-        isWritable = False
-    ElseIf ActivePresentation.ReadOnly = True Or ActivePresentation.Final Then
-        isWritable = False
-    Else
-        isWritable = True
-    End If
-End Function
 
 ' Get status for specific controls
 
@@ -29,6 +16,7 @@ Function isAutoUpdateSectionTimeline() As Boolean
     End If
     isAutoUpdateSectionTimeline = CBool(ActivePresentation.Tags("isAutoUpdateSectionTimeline") = "True")
 End Function
+
 
 Function isBoldActiveSection() As Boolean
     If ActivePresentation Is Nothing Then
@@ -63,6 +51,7 @@ Sub SetControlState(control As IRibbonControl, pressed As Boolean)
     tagId = control.Tag
     ActivePresentation.Tags.Add tagId, CStr(pressed)
     
+    ' Run an update if the control id is "IsBoldActiveSection"
     If tagId = "IsBoldActiveSection" Then
         UpdateFooterTimeline showMsgBox:=False
     End If

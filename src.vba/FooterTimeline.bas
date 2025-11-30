@@ -240,6 +240,28 @@ Function HasMinSectionCount(oSectionProperties As SectionProperties) As Boolean
 End Function
 
 
+' Disable updates in read-only mode
+Function isWritable() As Boolean
+    ' Because we don't have short-circuiting in if statements, we write them all out
+    ' NOTE:
+    ' - Modifications can be performed when `ActivePresentation.ReadOnly=True`, the
+    '     document just can't be saved with the same name
+    ' - Modifications can be performed when `ActivePresentation.ReadOnlyRecommended=True`,
+    '     after the user has selected "Edit Anyway". There does not seem to be a way to
+    '     distinguish before or after this textbox has been clicked, so it is best to not check
+    '     it at all, and handle subsequent errors accordingly.
+    If Application Is Nothing Then
+        isWritable = False
+    ElseIf ActivePresentation Is Nothing Then
+        isWritable = False
+    ElseIf ActivePresentation.Final Then
+        isWritable = False
+    Else
+        isWritable = True
+    End If
+End Function
+
+
 Function HasDarkBackground(oSlide As slide) As Boolean
     Dim rgb As MsoRGBType
     Dim r As Integer, g As Integer, b As Integer

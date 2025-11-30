@@ -7,12 +7,13 @@ Automatically update an in-slide section timeline.
 > The section timeline is located in the top right corner of the slide.
 
 - [PowerPoint Section Timeline Add-In](#powerpoint-section-timeline-add-in)
-    - [Features](#features)
-        - [Section Timeline](#section-timeline)
-        - [Change Video](#change-video)
-        - [Add to Group](#add-to-group)
-        - [Swap Animations](#swap-animations)
-    - [Installation](#installation)
+  - [Features](#features)
+    - [Section Timeline](#section-timeline)
+    - [Change Video](#change-video)
+    - [Add to Group](#add-to-group)
+    - [Swap Animations](#swap-animations)
+  - [Installation](#installation)
+  - [Developer Notes](#developer-notes)
 
 ## Features
 
@@ -83,3 +84,10 @@ Automatically update an in-slide section timeline.
 > `SectionTimeline.ppam`, PowerPoint will not be able to load it.
 
 To stop the functionality, the add-in can be disabled or removed at any time.
+
+## Developer Notes
+
+- The VBA source code is inside `SectionTimeline.pptm`.
+- For easier git diffs, the VBA code is auto-exported to `src.vba/` using
+  `dump_vba.py` before commits via a pre-commit hook.
+- Install pre-commit hooks with `pre-commit install`.

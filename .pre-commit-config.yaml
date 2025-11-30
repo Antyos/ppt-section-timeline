@@ -1,0 +1,7 @@
+repos:
+  - repo: local
+    hooks:
+      - id: dump-vba
+        language: python
+        name: Dump VBA code from Office files
+        entry: dump_vba.py

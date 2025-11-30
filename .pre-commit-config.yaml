@@ -4,4 +4,4 @@ repos:
       - id: dump-vba
         language: python
         name: Dump VBA code from Office files
-        entry: dump_vba.py
+        entry: uv run dump_vba.py

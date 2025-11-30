@@ -1,0 +1,493 @@
+Option Explicit
+
+' Base on: http://youpresent.co.uk/free-vba-add-shape-group/
+Sub ObjectsAddToGroupCmd(control As IRibbonControl)
+    Dim oGroup As Shape, oGroupWithAnimations As Shape
+    Dim oShapesToAdd As New Collection
+    Dim oShape As Shape
+    Dim numGroups As Integer
+    numGroups = 0
+
+    With ActiveWindow.Selection
+        ' Check that shapes are selected
+        If Not .Type = ppSelectionShapes Then Exit Sub
+        
+        ' oGroup will be the most recently selected group
+        For Each oShape In .ShapeRange
+            If oShape.Type = msoGroup Then
+                numGroups = numGroups + 1
+                Set oGroup = oShape
+                If oShape.animationSettings.Animate Then
+                    Set oGroupWithAnimations = oShape
+                End If
+            End If
+        Next
+
+        ' If there is more than one group selected, use the seected one with animations
+        If numGroups > 1 And Not oGroupWithAnimations Is Nothing Then
+            Set oGroup = oGroupWithAnimations
+        End If
+        
+        ' If we don't have a group selected, try to find the last selected shape with animations (or last selected shape)
+        If oGroup Is Nothing Then
+            For Each oShape In .ShapeRange
+                If oShape.animationSettings.Animate Then
+                    Set oGroupWithAnimations = oShape
+                End If
+            Next
+            ' Last shape with animations
+            If Not oGroupWithAnimations Is Nothing Then
+                Set oGroup = oGroupWithAnimations
+            ' Otherwise last selected shape
+            Else
+                Set oGroup = oShape
+            End If
+        End If
+        
+        ' All other shapes are considered shapes to add
+        For Each oShape In .ShapeRange
+            If Not oShape Is oGroup Then
+                oShapesToAdd.Add oShape
+            End If
+
+            ' Placeholder objects cannot be grouped
+            If oShape.Type = msoPlaceholder Then
+                MsgBox "Cannot group a placehold object", vbExclamation
+                Exit Sub
+            End If
+        Next
+    End With
+    
+    If oGroup Is Nothing Or oShapesToAdd.Count = 0 Then
+        MsgBox "Could not add objects to group." & vbNewLine & vbNewLine & " Make sure one object is a group or has animations", vbExclamation
+        Exit Sub
+    End If
+    
+    AddToGroup oGroup, oShapesToAdd
+End Sub
+
+
+Sub CanAddToGroup(control As IRibbonControl, ByRef returnedVal)
+    Dim oShape As Shape
+    returnedVal = False
+    With ActiveWindow.Selection
+        If Not .Type = ppSelectionShapes Then Exit Sub
+        ' Check that at least 1 shape is selected
+        If .ShapeRange.Count <= 1 Then Exit Sub
+        For Each oShape In .ShapeRange
+            If oShape.Child Then Exit Sub
+        Next
+    End With
+    returnedVal = True
+End Sub
+
+
+' There is no "good" way to add a shape to an existing group, so you have to ungroup
+' and re-group the shapes, then re-apply the name, position, and animations
+'
+' Returns
+' -------
+' True if successful, otherwise False
+Function AddToGroup(oGroup As Shape, oShapeToAdd As Variant, Optional ByRef shapeToReplace As Shape) As Shape
+    Dim currentViewType As Variant
+    Dim oGroupItems As New Collection
+    Dim shapesToAdd As New Collection
+    Dim effectIndices As Collection
+    Dim oGroupEffects As Collection
+    Dim groupZIndex As Integer
+    Dim groupName As String
+    Dim oShape As Shape
+    Dim oSlide As slide
+    Dim i As Integer
+    Dim startsAsGroup As Boolean
+    Dim isGroupAnimated As Boolean
+    
+    Set oSlide = ActiveWindow.View.slide
+
+    ' Get shapes we're adding
+    If TypeOf oShapeToAdd Is Shape Then
+        shapesToAdd.Add oShapeToAdd
+    ElseIf TypeOf oShapeToAdd Is Collection Or TypeOf oShapeToAdd Is ShapeRange Then
+        For Each oShape In oShapeToAdd
+            shapesToAdd.Add oShape
+        Next
+    ElseIf Not oShapeToAdd Is Nothing Then
+        err.Raise vbObjectError + 513, "SectionTimeline.AddToGroup", "Invalid variant type for oShapeToAdd"
+    End If
+
+    startsAsGroup = oGroup.Type = msoGroup
+    isGroupAnimated = oGroup.animationSettings.Animate
+    If isGroupAnimated Then
+        oGroup.PickupAnimation
+        ' Remove the animations of the shapes to add so the indices don't get screwed up
+        ' when trying to restore the animation locations
+        For Each oShape In shapesToAdd
+            DeleteAnimations oShape
+        Next
+        Set effectIndices = GetAnimationIndices(oGroup)
+    End If
+    
+    groupZIndex = oGroup.ZOrderPosition
+    groupName = oGroup.name
+    If startsAsGroup Then
+        For Each oShape In oGroup.GroupItems
+            oGroupItems.Add oShape
+        Next
+        ' Select the user group on its own
+        oGroup.Select msoTrue
+        ' Ungroup the user group, leaving all items selected
+        oGroup.Ungroup
+    Else
+        oGroupItems.Add oGroup
+    End If
+
+    ' Make sure the shapes' view is active by switching to a random view and then back to the user's view
+'    currentViewType = ActiveWindow.ViewType  ' Store the user's view type
+'    ActiveWindow.ViewType = ppViewSlide
+'    ActiveWindow.ViewType = ppViewNormal
+'    ActiveWindow.ViewType = currentViewType
+    
+    If Not shapeToReplace Is Nothing Then
+        If shapesToAdd.Count > 1 Then
+            err.Raise vbObjectError = 513, "SectionTimeline.AddToGroup", _
+                "Cannot pass parameter for 'ShapeToReplace' if 'oShapeToAdd' is a collection of multiple shapes"
+        End If
+        ' Match Z Index and remove shapeToReplace from oGroupItems
+        SetZIndex shapesToAdd(1), shapeToReplace.ZOrderPosition
+        For i = oGroupItems.Count To 1 Step -1
+            If oGroupItems.Item(i) Is shapeToReplace Then
+                oGroupItems.Remove i
+                Exit For
+            End If
+        Next
+    End If
+    
+    ' Select all of the shapes in the ungrouped collection
+    For Each oShape In oGroupItems
+        oShape.Select msoFalse
+    Next
+    ' Add the user object to be added to the group to the selection
+    For Each oShape In shapesToAdd
+        oShape.Select msoFalse
+    Next
+    
+    ' Group the original grouped items plus the new object
+        Set oGroup = ActiveWindow.Selection.ShapeRange.Group
+    
+    ' Transfer the animations back from the temporary shape
+    If isGroupAnimated Then
+        oGroup.ApplyAnimation
+        Set oGroupEffects = GetAnimations(oGroup)
+        ' We iterated backwards when getting the animations and the indices, so we need to do the same here too.
+        For i = oGroupEffects.Count To 1 Step -1
+            oGroupEffects(i).MoveTo effectIndices(i)
+        Next
+    End If
+
+    ' Reapply Z Index and group name
+    SetZIndex oGroup, groupZIndex
+    oGroup.name = groupName
+    
+    Set AddToGroup = oGroup
+End Function
+
+
+' Dumb function because there's no direct way to set Z-Index
+Sub SetZIndex(oShape As Shape, zIndex As Integer)
+    ' Sanity counter in case we somehow get into an infinite loop, we we exit if we loop over a million times
+    Dim counter As Long
+    ' Keep track of the previous zPos, so in case we don't move, we can exit
+    Dim zPos As Long
+    counter = 0
+    ' Better to go from the top down so we don't get into a loop trying to bring the item above where is possible
+    zPos = oShape.ZOrderPosition
+    While oShape.ZOrderPosition > zIndex And counter < 100000
+        oShape.ZOrder msoSendBackward
+        If oShape.ZOrderPosition = zPos Then GoTo ZForward
+        zPos = oShape.ZOrderPosition
+        counter = counter + 1
+    Wend
+ZForward:
+    counter = 0
+    zPos = oShape.ZOrderPosition
+    While oShape.ZOrderPosition < zIndex And counter < 100000
+        oShape.ZOrder msoBringForward
+        If oShape.ZOrderPosition = zPos Then Exit Sub
+        zPos = oShape.ZOrderPosition
+        counter = counter + 1
+    Wend
+End Sub
+
+
+Sub SwapAnimationsCommand()
+    With ActiveWindow.Selection.ShapeRange
+        If .Count <> 2 Then Exit Sub
+        If .Item(1).Child Or .Item(2).Child Then Exit Sub
+        TransferAnimations .Item(1), .Item(2), True
+    End With
+End Sub
+
+
+' Transfer animations from one object to another via pointer manipulation.
+' This does not play well with items in groups (i.e., transferring animations to a temporary object)
+Sub TransferAnimations(ByRef fromShape As Shape, ByRef toShape As Shape, Optional swap As Boolean)
+    Dim Effect As Effect
+    Dim i As Integer, j As Integer
+    Dim oSlide As slide
+    Set oSlide = ActiveWindow.View.slide
+    
+    With oSlide.TimeLine
+        ' Update the animations targets from the old video to new video
+        For i = .mainSequence.Count To 1 Step -1
+            Set Effect = .mainSequence(i)
+            If Effect.Shape Is fromShape Then
+                Effect.Shape = toShape
+            ElseIf swap And Effect.Shape Is toShape Then
+                Effect.Shape = fromShape
+            End If
+        Next i
+        
+        ' Iterate backwards so when we delete animations, it doesn't screw up the index
+        For i = .InteractiveSequences.Count To 1 Step -1
+            For j = .InteractiveSequences(i).Count To 1 Step -1
+                Set Effect = .InteractiveSequences(i).Item(j)
+                If Effect.Shape Is fromShape Then
+                    Effect.Shape = toShape
+                ElseIf swap And Effect.Shape Is toShape Then
+                    Effect.Shape = fromShape
+                End If
+            Next j
+        Next i
+    End With
+End Sub
+
+
+' Doesn't work with interactive sequences for now
+Function GetAnimationIndices(oShape As Shape) As Collection
+    Dim oEffect As Effect
+    Dim i As Integer, j As Integer
+    Dim oSlide As slide
+    Set oSlide = ActiveWindow.View.slide
+    Set GetAnimationIndices = New Collection
+    
+    ' Update the animations targets from the old video to new video
+    For i = oSlide.TimeLine.mainSequence.Count To 1 Step -1
+        Set oEffect = oSlide.TimeLine.mainSequence.Item(i)
+        If oEffect.Shape Is oShape Then
+            GetAnimationIndices.Add oEffect.Index
+        End If
+    Next i
+    
+    ' Iterate backwards so when we delete animations, it doesn't screw up the index
+'    For i = oSlide.TimeLine.InteractiveSequences.Count To 1 Step -1
+'        For j = oSlide.TimeLine.InteractiveSequences.Item(i).Count To 1 Step -1
+'            Set Effect = oSlide.TimeLine.InteractiveSequences.Item(i).Item(j)
+'            If Effect.Shape Is oShape Then Effect.Delete
+'        Next j
+'    Next i
+End Function
+
+
+' Doesn't work with interactive sequences for now
+Function GetAnimations(oShape As Shape) As Collection
+    Dim oEffect As Effect
+    Dim i As Integer, j As Integer
+    Dim oSlide As slide
+    Set oSlide = ActiveWindow.View.slide
+    Set GetAnimations = New Collection
+    
+    ' Update the animations targets from the old video to new video
+    For i = oSlide.TimeLine.mainSequence.Count To 1 Step -1
+        Set oEffect = oSlide.TimeLine.mainSequence.Item(i)
+        If oEffect.Shape Is oShape Then
+            GetAnimations.Add oEffect
+        End If
+    Next i
+    
+    ' Iterate backwards so when we delete animations, it doesn't screw up the index
+'    For i = oSlide.TimeLine.InteractiveSequences.Count To 1 Step -1
+'        For j = oSlide.TimeLine.InteractiveSequences.Item(i).Count To 1 Step -1
+'            Set Effect = oSlide.TimeLine.InteractiveSequences.Item(i).Item(j)
+'            If Effect.Shape Is oShape Then Effect.Delete
+'        Next j
+'    Next i
+End Function
+
+
+Sub DeleteAnimations(oShape As Shape)
+    Dim Effect As Effect
+    Dim i As Integer, j As Integer
+    Dim oSlide As slide
+    Set oSlide = ActiveWindow.View.slide
+    
+    ' Update the animations targets from the old video to new video
+    For i = oSlide.TimeLine.mainSequence.Count To 1 Step -1
+        Set Effect = oSlide.TimeLine.mainSequence.Item(i)
+        If Effect.Shape Is oShape Then Effect.Delete
+    Next i
+    
+    ' Iterate backwards so when we delete animations, it doesn't screw up the index
+    For i = oSlide.TimeLine.InteractiveSequences.Count To 1 Step -1
+        For j = oSlide.TimeLine.InteractiveSequences.Item(i).Count To 1 Step -1
+            Set Effect = oSlide.TimeLine.InteractiveSequences.Item(i).Item(j)
+            If Effect.Shape Is oShape Then Effect.Delete
+        Next j
+    Next i
+End Sub
+
+
+Sub TestAddToGroup()
+    Dim s1 As Shape, s2 As Shape, s3 As Shape, s4 As Shape, s5 As Shape
+    Dim sGroup As Shape
+    Dim oGroup As Shape
+    
+    Dim oSlide As slide
+    Set oSlide = ActiveWindow.View.slide
+    
+    Dim errId As Long: errId = vbObjectError + 513
+    Dim errSource As String: errSource = "SectionStatusBar.TestAddToUnnestedGroup"
+    Dim i As Integer
+    
+    ' Clear slide contents
+    For i = oSlide.Shapes.Count To 1 Step -1
+        oSlide.Shapes(i).Delete
+    Next
+    
+    ' Setup contents
+    Set s1 = oSlide.Shapes.AddShape(msoShapeOval, 100, 150, 150, 150):      s1.name = "s1"
+    Set s2 = oSlide.Shapes.AddShape(msoShapeRectangle, 600, 200, 200, 300): s2.name = "s2"
+    Set s3 = oSlide.Shapes.AddShape(msoShapeTrapezoid, 300, 100, 100, 200): s3.name = "s3"
+    Set s4 = oSlide.Shapes.AddShape(msoShape6pointStar, 400, 50, 100, 100): s4.name = "s4"
+    Set s5 = oSlide.Shapes.AddShape(msoShapeCan, 500, 20, 80, 100):         s5.name = "s5"
+    
+    ' Test no animations
+    Set sGroup = AddToGroup(s1, s2)
+    If s1.Type <> msoGroup Or s1.GroupItems.Count <> 2 Then
+        err.Raise errId, errSource, "Failed to group shapes"
+    End If
+    sGroup.Ungroup
+    ' Reset pointers
+    Set s1 = oSlide.Shapes("s1")
+    Set s2 = oSlide.Shapes("s2")
+    
+    With oSlide.TimeLine.mainSequence
+        .AddEffect s1, msoAnimEffectFade
+        .AddEffect s3, msoAnimEffectAscend
+        .AddEffect s1, msoAnimEffectFlashOnce
+    End With
+    
+    ' Group two shapes, one of which has animations
+    Set s1 = AddToGroup(s1, s2)
+    
+    ' Assertions
+    If s1.Type <> msoGroup Or s1.GroupItems.Count <> 2 Then
+        err.Raise errId, errSource, "Failed to group shapes"
+    End If
+    With oSlide.TimeLine.mainSequence
+        If Not (.Count = 3 And .Item(1).Shape Is s1 And .Item(2).Shape Is s3 And .Item(3).Shape Is s1) Then
+            err.Raise errId, errSource, "Failed to group separate shapes with animations"
+        End If
+    End With
+    
+    
+    ' Add another shape to the existing group
+    Set s1 = AddToGroup(s1, s4)
+    
+    ' Assertions
+    If s1.Type <> msoGroup Or s1.GroupItems.Count <> 3 Then
+        err.Raise errId, errSource, "Failed to group shapes"
+    End If
+    With oSlide.TimeLine.mainSequence
+        If Not (.Count = 3 And .Item(1).Shape Is s1 And .Item(2).Shape Is s3 And .Item(3).Shape Is s1) Then
+            err.Raise vbObjectError + 513, "SectionStatusBar.TestAddToGroup", "Failed to group separate shapes with animations"
+        End If
+    End With
+    
+    
+    s1.Ungroup
+    ' Test adding multiple objects to a group
+    With oSlide
+        .Shapes("s1").Select msoTrue
+        .Shapes("s2").Select msoFalse
+        Set sGroup = ActiveWindow.Selection.ShapeRange.Group
+        sGroup.name = "sGroup"
+        Dim shapesToAdd As New Collection
+        shapesToAdd.Add .Shapes("s3")
+        shapesToAdd.Add .Shapes("s4")
+    End With
+    
+    With oSlide.TimeLine.mainSequence
+        .AddEffect sGroup, msoAnimEffectFade
+        .AddEffect oSlide.Shapes("s5"), msoAnimEffectAscend
+        .AddEffect sGroup, msoAnimEffectSpin
+        .AddEffect oSlide.Shapes("s5"), msoAnimEffectLighten
+        .AddEffect sGroup, msoAnimEffectTeeter
+    End With
+
+    Set s1 = AddToGroup(sGroup, shapesToAdd)
+    
+    ' Assertions
+    If s1.Type <> msoGroup Or s1.GroupItems.Count <> 4 Then
+        err.Raise errId, errSource, "Failed to add multiple shapes to a group."
+    End If
+    With oSlide.TimeLine.mainSequence
+        If .Count <> 5 Then
+            err.Raise vbObjectError + 513, "SectionStatusBar.TestAddToGroup", "Failed to group separate shapes with animations--wrong animation number"
+        End If
+        If Not (.Item(1).Shape Is s1 And .Item(2).Shape Is s5 And .Item(3).Shape Is s1 And .Item(4).Shape Is s5 And .Item(5).Shape Is s1) Then
+            err.Raise vbObjectError + 513, "SectionStatusBar.TestAddToGroup", "Failed to group separate shapes with animations--Order is not maintained"
+        End If
+    End With
+    
+    
+End Sub
+
+
+'Sub TestAddToNestedGroup()
+'    Dim s1 As Shape, s2 As Shape, s3 As Shape, s4 As Shape, s5 As Shape
+'    Dim subGroup As Shape, oGroup As Shape
+'
+'    Dim oSlide As slide
+'    Set oSlide = ActiveWindow.View.slide
+'
+'    Dim errId As Long: errId = vbObjectError + 513
+'    Dim errSource As String: errSource = "SectionStatusBar.TestAddToUnnestedGroup"
+'    Dim i As Integer
+'
+'    ' Clear slide contents
+'    For i = oSlide.Shapes.Count To 1 Step -1
+'        oSlide.Shapes(i).Delete
+'    Next
+'
+'    ' Setup contents
+'    Set s1 = oSlide.Shapes.AddShape(msoShapeOval, 100, 150, 150, 150):      s1.name = "s1"
+'    Set s2 = oSlide.Shapes.AddShape(msoShapeRectangle, 600, 200, 200, 300): s2.name = "s2"
+'    Set s3 = oSlide.Shapes.AddShape(msoShapeTrapezoid, 300, 100, 100, 200): s3.name = "s3"
+'    Set s4 = oSlide.Shapes.AddShape(msoShape6pointStar, 400, 50, 100, 100): s4.name = "s4"
+'    Set s5 = oSlide.Shapes.AddShape(msoShapeCan, 500, 20, 80, 100):         s5.name = "s5"
+'
+'
+'    s1.Select msoTrue
+'    s2.Select msoFalse
+'    Set subGroup = ActiveWindow.Selection.ShapeRange.Group
+'    subGroup.name = "SubGroup"
+'
+'    subGroup.Select msoTrue
+'    s3.Select msoFalse
+'    Set oGroup = ActiveWindow.Selection.ShapeRange.Group
+'    oGroup.name = "Group"
+'
+'    With oSlide.TimeLine.mainSequence
+'        .AddEffect oGroup, msoAnimEffectFade
+'        .AddEffect oSlide.Shapes("s5"), msoAnimEffectAscend
+'        .AddEffect oGroup, msoAnimEffectSpin
+'        .AddEffect oSlide.Shapes("s5"), msoAnimEffectLighten
+'        .AddEffect oGroup, msoAnimEffectTeeter
+'    End With
+'
+'    ''' Test '''
+'    oGroup.GroupItems("SubGroup").Select msoTrue
+'    oSlide.Shapes("s4").Select msoFalse
+'
+'    AddToGroup oSlide.Shapes("SubGroup"), oSlide.Shapes("s4")
+'End Sub

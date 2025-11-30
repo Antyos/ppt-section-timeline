@@ -1,0 +1,231 @@
+Option Explicit
+
+Public Const MIN_SECTIONS As Integer = 2
+Private PPTEventHandler As New FooterTimelineHandler
+
+Sub Auto_Open()
+    Set PPTEventHandler.oApp = Application
+End Sub
+
+
+Sub UpdateFootersWithSectionNames(control As IRibbonControl)
+    UpdateFooterTimeline showMsgBox:=True
+End Sub
+
+Sub SlideOrderChanged()
+    UpdateFooterTimeline showMsgBox:=False, changedOnly:=True
+End Sub
+
+
+Sub UpdateFooterTimeline(showMsgBox As Boolean, Optional changedOnly As Boolean)
+    Dim pptPresentation As Presentation
+    Dim oSlide As slide
+    Dim sections As SectionProperties
+    Dim footerText As String
+    Dim firstSectionIndex As Integer
+    Dim i As Integer
+    
+    Set pptPresentation = ActivePresentation
+    ' Don't try modifying read-only presentations
+    If pptPresentation.ReadOnly Then
+        Exit Sub
+    End If
+    
+    Set sections = pptPresentation.SectionProperties
+    
+    If Not HasMinSectionCount(sections) Then
+        If showMsgBox Then MsgBox "Must have at least " & MIN_SECTIONS & " section" & IIf(MIN_SECTIONS > 1, "s", "") & " to update labels"
+        Exit Sub
+    End If
+    
+    footerText = GetFooterText()
+    firstSectionIndex = GetFirstSectionIndex()
+    
+    ' Loop through each slide and update the footer
+    ' 'For' instead of 'For Each' becuase the index is convenient here for debugging
+    For i = 1 To pptPresentation.Slides.Count
+        Set oSlide = pptPresentation.Slides(i)
+        
+        If changedOnly Then
+            If Not (oSlide.HeadersFooters.footer.Visible) Then GoTo NextSlide
+                ' Exit if no change to slide. Use slide name instead of index to handle renamed sections
+            If oSlide.Tags("sectionLabel") = sections.name(oSlide.sectionIndex) And oSlide.HeadersFooters.footer.Text = footerText Then
+                GoTo NextSlide
+            End If
+        End If
+        
+        UpdateFooterOnSlide oSlide, footerText, firstSectionIndex
+NextSlide:
+    Next i
+    
+    If showMsgBox Then MsgBox "Footers updated with section names!", vbInformation
+End Sub
+
+
+Sub UpdateFooterOnSlide(oSlide As slide, footerText As String, Optional firstSectionIndex As Integer)
+    Dim sectionName As String
+    Dim oShape As Shape
+    Dim oTextRange As textRange
+    
+    sectionName = ActivePresentation.SectionProperties.name(oSlide.sectionIndex)
+        
+    If Not (oSlide.HeadersFooters.footer.Visible) Then Exit Sub
+    
+    ' No headers in sections starting with '_' (clear text)
+    If SkipSection(sectionName) Then
+        oSlide.HeadersFooters.footer.Text = ""
+        Exit Sub
+    End If
+    
+    ' If the slide was in the first section, Reset the style in textbox of slides in the
+    ' first section to use the "other section" font so that the "current section" font
+    ' (being the font at the first character) does not propagate to the other sections.
+    If oSlide.Tags("isFirstSection") = "True" Then
+        ResetFontInFooters oSlide
+    End If
+    ' Update the slide sectionLabel tag
+    If IsMissing(firstSectionIndex) Then firstSectionIndex = GetFirstSectionIndex()
+    oSlide.Tags.Add "isFirstSection", CStr(oSlide.sectionIndex = firstSectionIndex)  ' Convert bool to string (capital first char)
+    
+    oSlide.Tags.Add "sectionLabel", sectionName
+    
+    ' Update the footer text
+    oSlide.HeadersFooters.footer.Text = footerText
+    
+    ' Isolate the footer textbox to set the color
+    For Each oShape In oSlide.Shapes
+        ' Annoyingly, VBA doesn't support shortcircuit operations in if statements...
+        If oShape.Type <> msoPlaceholder Then GoTo NextShape2
+        If oShape.PlaceholderFormat.Type <> ppPlaceholderFooter Then GoTo NextShape2
+        
+        Dim sectionStart As Integer
+        sectionStart = InStr(footerText, sectionName)
+        If sectionStart > 0 Then
+            Set oTextRange = oShape.TextFrame.textRange.Characters(Start:=sectionStart, Length:=Len(sectionName))
+            If HasDarkBackground(oSlide) Then
+                oTextRange.Font.Color.rgb = rgb(255, 255, 255)
+            Else:
+                oTextRange.Font.Color.rgb = rgb(0, 0, 0)
+            End If
+            If isBoldActiveSection Then
+                oTextRange.Font.Bold = True
+            End If
+            
+        End If
+NextShape2:
+    Next oShape
+End Sub
+
+
+' Collect the names of all the valid sections
+Function GetFooterText() As String
+    Dim sectionName As String
+    Dim sections As SectionProperties
+    Set sections = ActivePresentation.SectionProperties
+    Dim sectionSeparator As String
+    sectionSeparator = ActivePresentation.Tags("SectionSeparator")
+    If sectionSeparator = "" Then sectionSeparator = "  >  "
+    Dim i As Integer
+
+    GetFooterText = ""
+    ' Collect the section names into a single string
+    For i = 1 To sections.Count
+        sectionName = sections.name(i)
+        If SkipSection(sectionName) Then GoTo NextSection
+        
+        If GetFooterText <> "" Then
+            GetFooterText = GetFooterText & sectionSeparator
+        End If
+        GetFooterText = GetFooterText & sectionName
+NextSection:
+    Next i
+End Function
+
+
+' Get the index of the first section
+Function GetFirstSectionIndex() As Integer
+    Dim sectionName As String
+    Dim sections As SectionProperties
+    Set sections = ActivePresentation.SectionProperties
+    Dim i As Integer
+    
+    For i = 1 To sections.Count
+        sectionName = sections.name(i)
+        If Not SkipSection(sectionName) Then
+            GetFirstSectionIndex = i
+            Exit Function
+        End If
+    Next i
+    GetFirstSectionIndex = -1
+End Function
+
+
+' Reset the font in all footer text boxes to match that of the last character
+Function ResetFontInFooters(oSlide As slide)
+    Dim oShape As Shape
+    Dim oTextRange As textRange
+    Dim lastCharFont As Font
+    
+    For Each oShape In oSlide.Shapes
+        ' Annoyingly, VBA doesn't support shortcircuit operations in if statements...
+        If oShape.Type <> msoPlaceholder Then GoTo NextShape1
+        If oShape.PlaceholderFormat.Type <> ppPlaceholderFooter Then GoTo NextShape1
+        If Not (oShape.HasTextFrame) Then GoTo NextShape1
+        If Not (oShape.TextFrame.HasText) Then GoTo NextShape1
+        
+        Set oTextRange = oShape.TextFrame.textRange
+        ' Get the font of the last character
+        Set lastCharFont = oTextRange.Characters(oTextRange.Length).Font
+        
+        ' Apply the font of the last character to all characters in the textbox
+         With oTextRange.Font
+            .name = lastCharFont.name
+            .Size = lastCharFont.Size
+            .Bold = lastCharFont.Bold
+            .Italic = lastCharFont.Italic
+            .Underline = lastCharFont.Underline
+            .Color = lastCharFont.Color
+        End With
+NextShape1:
+    Next oShape
+End Function
+
+
+' Skip the section if it is named "Default Section" or starts with a '_'
+Function SkipSection(sectionName As String) As Boolean
+    SkipSection = (sectionName = "Default Section" Or Left(sectionName, 1) = "_")
+End Function
+
+
+Function HasMinSectionCount(oSectionProperties As SectionProperties) As Boolean
+    Dim i As Integer
+    Dim numValidSections As Integer
+    numValidSections = 0
+    
+    For i = 1 To oSectionProperties.Count
+        If Not SkipSection(oSectionProperties.name(i)) Then
+            numValidSections = numValidSections + 1
+        End If
+    Next
+    HasMinSectionCount = numValidSections >= MIN_SECTIONS
+End Function
+
+Function HasDarkBackground(oSlide As slide) As Boolean
+    Dim rgb As MsoRGBType
+    Dim r As Integer, g As Integer, b As Integer
+    Dim grey As Double
+    
+    ' For some reason, the background color is the 'forecolor' of the background. Go figure...
+    rgb = oSlide.Background.Fill.ForeColor.rgb
+    
+    ' Extract RGB components of the background color
+    ' Note: '\' is integer division rather than '/'
+    r = rgb Mod 256
+    g = (rgb \ 256) Mod 256
+    b = (rgb \ 256 ^ 2) Mod 256
+    
+    ' Calculate the greyscale value (compensated for human color sensitivity)
+    grey = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    
+    HasDarkBackground = grey < 0.5
+End Function
